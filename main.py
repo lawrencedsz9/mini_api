@@ -52,6 +52,13 @@ def get_tasks_for_user(user_id:int):
     
     return user_tasks
 
+@app.put("/tasks/{task_id}/toggle")
+def toggle_task_completion(task_id: int):
+    if task_id not in tasks:
+        raise HTTPException(status_code=404, detail="Task not found")
+    
+    tasks[task_id]["completed"] = not tasks[task_id]["completed"]
+    return {"message": "Task completion status toggled"}
 
 @app.post("/users")
 def create_user(user:User):
