@@ -1,80 +1,57 @@
-from fastapi import FastAPI ,HTTPException 
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from db import engine, Base, SessionLocal
+from models import UserDB
+
+# Create tables
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-users = {}
-
-tasks = {}
+# ---------- Pydantic Schemas ----------
 
 class User(BaseModel):
-    id:int
-    name:str
+    id: int
+    name: str
 
-class Task(BaseModel):
-    id:int
-    title:str
-    completed:bool = False
-    user_id:int
+# ---------- DB Dependency ----------
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# ---------- Routes ----------
 
 @app.get("/")
-def read_root():
-    return {"Message": "Backend started"}
+def root():
+    return {"message": "Backend started"}
+
+@app.post("/users")
+def create_user(user: User, db: Session = Depends(get_db)):
+    existing_user = db.query(UserDB).filter(UserDB.id == user.id).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    new_user = UserDB(id=user.id, name=user.name)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return {"message": "User created successfully"}
 
 @app.get("/users")
-def get_users():
+def get_users(db: Session = Depends(get_db)):
+    users = db.query(UserDB).all()
     return users
 
 @app.get("/users/{user_id}")
-def get_user(user_id:int):
-    if user_id not in users:
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    return users[user_id]   
-
-@app.get("/tasks")
-def get_tasks():
-    return tasks
-
-@app.get("/users/{user_id}/tasks")
-def get_tasks_for_user(user_id:int):
-    if user_id not in users:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    user_tasks = []
-
-    for task in tasks.values():
-        if task["user_id"] == user_id:
-            user_tasks.append(task)
-
-    if not user_tasks:
-        return {"message": "No tasks for this user"}
-    
-    return user_tasks
-
-@app.put("/tasks/{task_id}/toggle")
-def toggle_task_completion(task_id: int):
-    if task_id not in tasks:
-        raise HTTPException(status_code=404, detail="Task not found")
-    
-    tasks[task_id]["completed"] = not tasks[task_id]["completed"]
-    return {"message": "Task completion status toggled"}
-
-@app.post("/users")
-def create_user(user:User):
-    if user.id in users:
-        raise HTTPException(status_code=400, detail="User already exists")
-    
-    users[user.id]= user.model_dump()
-    return {"message":"User created successfully"}
-
-@app.post("/tasks")
-def create_task(task:Task):
-    if task.id in tasks:
-        raise HTTPException(status_code=400, detail="Task already exists")
-    
-    if task.user_id not in users:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    tasks[task.id]= task.model_dump()
-    return {"message":"Task created successfully"}
+    return user
