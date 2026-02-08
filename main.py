@@ -3,7 +3,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from db import engine, Base, SessionLocal
-from models import UserDB
+from models import UserDB, TaskDB
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -15,6 +15,12 @@ app = FastAPI()
 class User(BaseModel):
     id: int
     name: str
+
+class Task(BaseModel):
+    id: int
+    title: str
+    completed: bool = False
+    user_id: int
 
 # ---------- DB Dependency ----------
 
@@ -55,3 +61,37 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
+
+@app.get("/tasks")
+def get_tasks(db: Session = Depends(get_db)):
+    tasks = db.query(TaskDB).all()
+    return tasks
+
+@app.get("/users/{user_id}/tasks")
+def get_tasks_for_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.id == user_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    return user.tasks
+
+
+@app.post("/tasks")
+def create_task(task: Task, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.id == task.user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_task = TaskDB(
+        id=task.id,
+        title=task.title,
+        completed=task.completed,
+        user_id=task.user_id
+    )
+
+    db.add(new_task)
+    db.commit()
+    db.refresh(new_task)
+
+    return {"message": "Task created successfully", "task": new_task}
