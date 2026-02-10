@@ -22,6 +22,12 @@ class Task(BaseModel):
     completed: bool = False
     user_id: int
 
+    class Config:
+        orm_mode = True
+
+class TaskUpdate(BaseModel):
+    title: str | None = None
+    completed: bool | None = None
 # ---------- DB Dependency ----------
 
 def get_db():
@@ -95,3 +101,46 @@ def create_task(task: Task, db: Session = Depends(get_db)):
     db.refresh(new_task)
 
     return {"message": "Task created successfully", "task": new_task}
+
+@app.delete("/tasks/{task_id}")
+def delete_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(TaskDB).filter(TaskDB.id == task_id).first()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    db.delete(task)
+    db.commit()
+
+    return {"message": "Task deleted successfully"}
+
+@app.put("/tasks/{task_id}/toggle")
+def toggle_task(task_id: int, db: Session = Depends(get_db)):
+    task = db.query(TaskDB).filter(TaskDB.id == task_id).first()
+
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task.completed = not task.completed
+    db.commit()
+    db.refresh(task)
+
+    return task
+
+@app.put("/tasks/{task_id}")
+def update_task(task_id: int, task: TaskUpdate, db: Session = Depends(get_db)):
+    db_task = db.query(TaskDB).filter(TaskDB.id == task_id).first()
+
+    if not db_task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task.title is not None:
+        db_task.title = task.title
+    if task.completed is not None:
+        db_task.completed = task.completed
+
+    db.commit()
+    db.refresh(db_task)
+
+    return db_task
+
