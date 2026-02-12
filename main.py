@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from db import engine, Base, SessionLocal
 from models import UserDB, TaskDB
-
+from passlib.context import CryptContext
 # Create tables
 Base.metadata.create_all(bind=engine)
 
@@ -14,6 +14,7 @@ app = FastAPI()
 
 class UserCreate(BaseModel):
     name: str
+    password: str
 
 class UserResponse(BaseModel):
     id: int
@@ -63,12 +64,20 @@ def root():
 
 @app.post("/users", response_model=UserResponse)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    new_user = UserDB(name=user.name)
+    existing = db.query(UserDB).filter(UserDB.name == user.name).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    new_user = UserDB(
+        name=user.name,
+        password=hash_password(user.password)
+    )
+
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return new_user
 
+    return new_user
 
 @app.get("/users", response_model=list[UserResponse])
 def get_users(db: Session = Depends(get_db)):
@@ -151,3 +160,14 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     db.delete(task)
     db.commit()
     return {"message": "Task deleted successfully"}
+
+pwd_context = CryptContext(
+    schemes=["bcrypt_sha256"],
+    deprecated="auto"
+)
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
