@@ -1,14 +1,30 @@
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from datetime import datetime, timedelta
+from jose import jwt
+from passlib.context import CryptContext
 
 from db import engine, Base, SessionLocal
 from models import UserDB, TaskDB
-from passlib.context import CryptContext
-# Create tables
-Base.metadata.create_all(bind=engine)
+from fastapi.security import OAuth2PasswordBearer
 
+# ---------- App & DB ----------
+
+Base.metadata.create_all(bind=engine)
 app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+# ---------- Auth Config ----------
+
+SECRET_KEY = "super-secret-key-change-this"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+pwd_context = CryptContext(
+    schemes=["bcrypt_sha256"],
+    deprecated="auto"
+)
 
 # ---------- Pydantic Schemas ----------
 
@@ -16,17 +32,25 @@ class UserCreate(BaseModel):
     name: str
     password: str
 
+
 class UserResponse(BaseModel):
     id: int
     name: str
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
 class TaskCreate(BaseModel):
     title: str
     user_id: int
+
+
+class TaskUpdate(BaseModel):
+    title: str | None = None
+    completed: bool | None = None
+
 
 class TaskResponse(BaseModel):
     id: int
@@ -34,14 +58,14 @@ class TaskResponse(BaseModel):
     completed: bool
     user_id: int
 
-    class Config:
-        orm_mode = True
+    model_config = {
+        "from_attributes": True
+    }
 
 
-class TaskUpdate(BaseModel):
-    title: str | None = None
-    completed: bool | None = None
-
+class LoginRequest(BaseModel):
+    name: str
+    password: str
 
 # ---------- DB Dependency ----------
 
@@ -52,13 +76,27 @@ def get_db():
     finally:
         db.close()
 
+# ---------- Utils ----------
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # ---------- Routes ----------
 
 @app.get("/")
 def root():
     return {"message": "Backend started"}
-
 
 # ----- Users -----
 
@@ -76,8 +114,8 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
     return new_user
+
 
 @app.get("/users", response_model=list[UserResponse])
 def get_users(db: Session = Depends(get_db)):
@@ -90,7 +128,6 @@ def get_user(user_id: int, db: Session = Depends(get_db)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
-
 
 # ----- Tasks -----
 
@@ -117,6 +154,7 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
         title=task.title,
         user_id=task.user_id
     )
+
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
@@ -161,13 +199,24 @@ def delete_task(task_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Task deleted successfully"}
 
-pwd_context = CryptContext(
-    schemes=["bcrypt_sha256"],
-    deprecated="auto"
-)
+# ----- Auth -----
 
-def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+@app.post("/login")
+def login(data: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(UserDB).filter(UserDB.name == data.name).first()
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    if not user or not verify_password(data.password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    access_token = create_access_token(
+        data={"sub": str(user.id)},
+        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+@app.get("/me")
+def me(token: str = Depends(oauth2_scheme)):
+    return {"token_received": token}
