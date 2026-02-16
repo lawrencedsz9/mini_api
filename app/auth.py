@@ -8,8 +8,10 @@ from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
 from app.models import UserDB
+import os
 
-SECRET_KEY = "super-secret-key-change-this"
+SECRET_KEY = os.getenv("SECRET_KEY")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
