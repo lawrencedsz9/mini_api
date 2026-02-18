@@ -6,14 +6,9 @@ from jose import jwt, JWTError
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
+from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 from app.dependencies import get_db
 from app.models import UserDB
-import os
-
-SECRET_KEY = os.getenv("SECRET_KEY")
-
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 pwd_context = CryptContext(
     schemes=["bcrypt_sha256"],

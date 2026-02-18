@@ -7,15 +7,20 @@ __pycache__/
 env/
 venv/
 ENV/
+env.bak/
+venv.bak/
 *.egg-info/
 dist/
 build/
+pip-log.txt
+pip-delete-this-directory.txt
 
 # Database files
 *.db
 *.sqlite
 *.sqlite3
 app.db
+*.db-journal
 
 # IDE
 .vscode/
@@ -26,11 +31,14 @@ app.db
 
 # Environment variables
 .env
-.env.local
+.env.*
+!.env.example
+*.env
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Testing
 .pytest_cache/
