@@ -1,6 +1,6 @@
 # Mini API
 
-A production-ready FastAPI application with JWT authentication, SQLAlchemy ORM, and task management.
+A FastAPI application with JWT authentication, SQLAlchemy ORM, and task management.
 
 ## Project Structure
 
@@ -9,9 +9,8 @@ mini_api/
 ├── __init__.py                 # Root package initialization
 ├── README.md                   # Project documentation
 ├── requirements.txt            # Python dependencies
-├── DEPLOYMENT.md               # Render deployment guide (local only)
 └── app/
-    ├── __init__.py            # App package initialization
+    ├── __init__.py            
     ├── main.py                # FastAPI routes and app initialization
     ├── auth.py                # Authentication utilities and JWT handling
     ├── config.py              # Centralized configuration (env vars)
@@ -64,20 +63,18 @@ The app will be available at **http://localhost:8000**
 
 ## Security
 
-- **Password Hashing**: PBKDF2-SHA256 (unlimited password length, no truncation)
+- **Password Hashing**: PBKDF2-SHA256 
 - **JWT Tokens**: HS256 algorithm with configurable expiration
 - **Protected Routes**: OAuth2 Bearer token required
 - **User Isolation**: Users only see their own tasks
 
 ## Deployment
 
-See **[DEPLOYMENT.md](DEPLOYMENT.md)** for complete step-by-step instructions to deploy on Render.
-
 Quick summary:
 1. Create PostgreSQL database on Render
 2. Create Web Service connected to GitHub repo
 3. Set environment variables
-4. Deploy! 🚀
+4. Deploy
 
 ## Testing Endpoints Locally
 
@@ -109,14 +106,12 @@ Invoke-RestMethod -Uri http://localhost:8000/tasks -Method Post `
 - **ORM**: SQLAlchemy
 - **Authentication**: JWT (python-jose)
 - **Password Hashing**: Passlib (PBKDF2-SHA256)
-- **Database**: SQLite (local) / PostgreSQL (production)
+- **Database**: SQLite (local) / PostgreSQL (production or via Render Hosting)
 - **Server**: Uvicorn
 
-## License
 
-MIT
 
-**Production (Render):**
+**Hosting via Render:**
 - PostgreSQL managed by Render
 - Connection via `DATABASE_URL` environment variable
 
